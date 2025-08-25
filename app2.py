@@ -34,7 +34,7 @@ factor_options = {
 # ─── Sidebar: Dataset selector by friendly name ────────────────────────────
 dataset_names = [meta["name"] for meta in DATASET_META.values()]
 with st.sidebar:
-    dataset_name_choice = st.selectbox("Select dataset", dataset_names, index=0)
+    dataset_name_choice = st.selectbox("Select Type", dataset_names, index=0)
 
 # Map back from friendly name -> key ("set1"/"set2"/"set3")
 dataset_choice = next(k for k, v in DATASET_META.items() if v["name"] == dataset_name_choice)
