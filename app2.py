@@ -68,7 +68,7 @@ with st.sidebar:
 
 # ─── Step 2: Table 1 – Pressure Altitude × OAT (Bilinear Interpolation) ───
 raw1 = pd.read_csv(datafile("pressureheight_oat.csv"), skiprows=[0])
-raw1 = raw1.rename(columns={raw1.columns[0]: "dummy", raw1.columns[1]: "PressAlt"])
+raw1 = raw1.rename(columns={raw1.columns[0]: "dummy", raw1.columns[1]: "PressAlt"})
 tbl1 = raw1.drop(columns=["dummy"]).set_index("PressAlt")
 tbl1.columns = tbl1.columns.astype(int)
 
