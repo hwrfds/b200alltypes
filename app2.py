@@ -3,9 +3,27 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
-# ─── Page Setup ─────────────────────────────────────────────────────────────
+# ─── Page Setup (must be first Streamlit call) ─────────────────────────────
 st.set_page_config(page_title="RFDS QLD B200 Landing Distance Calculator", layout="wide")
-st.title("🛬 RFDS QLD B200 King Air Landing Distance Calculator — NOT FOR OPERATIONAL USE")
+
+# ─── Dataset mapping for header & footer ───────────────────────────────────
+DATASET_META = {
+    "set1": {
+        "name": "B200 Paved",
+        "title": "🛬 RFDS QLD B200 King Air — Paved Runways",
+        "footer": "Dataset: B200 Paved performance tables (no mods).",
+    },
+    "set2": {
+        "name": "B200 Grass",
+        "title": "🛬 RFDS QLD B200 King Air — Grass Runways",
+        "footer": "Dataset: B200 Grass performance tables.",
+    },
+    "set3": {
+        "name": "B200 Raisbeck",
+        "title": "🛬 RFDS QLD B200 King Air — Raisbeck Mod",
+        "footer": "Dataset: B200 with Raisbeck performance package.",
+    },
+}
 
 # Landing distance factors selectable in the sidebar
 factor_options = {
@@ -13,16 +31,21 @@ factor_options = {
     "Approved Factor (1.20)": 1.20,
 }
 
-# ─── Step 0: Dataset selector ──────────────────────────────────────────────
+# ─── Sidebar: Dataset selector + inputs ────────────────────────────────────
 with st.sidebar:
     dataset_choice = st.selectbox("Select dataset", ["set1", "set2", "set3"], index=0)
+    st.caption(f"Active dataset: **{DATASET_META[dataset_choice]['name']}**")
+
 DATA_ROOT = Path("data") / dataset_choice
 
 def datafile(name: str) -> Path:
     """Resolve a filename inside the selected dataset folder."""
     return DATA_ROOT / name
 
-# ─── Step 1: User Inputs ───────────────────────────────────────────────────
+# Dynamic page header (on-page)
+st.title(DATASET_META[dataset_choice]["title"])
+
+# ─── User Inputs ───────────────────────────────────────────────────────────
 with st.sidebar:
     press_alt = st.slider("Pressure Altitude (ft)", 0, 10000, 0, 250)
     oat = st.slider("Outside Air Temperature (°C)", -5, 45, 15, 1)
@@ -106,21 +129,19 @@ df2.columns = wt_cols
 
 def lookup_tbl2_interp(df, baseline, w, ref_weight=12500, _debug=False, _st=None):
     """
-    Nearest-columns 2D interpolation on ABSOLUTE values (preferred).
+    Nearest-columns 2D interpolation on ABSOLUTE values.
     Returns the absolute weight-adjusted distance.
     """
     tbl = df.copy()
     tbl.columns = [int(c) for c in tbl.columns]
 
-    # Choose a reference column as x-axis (e.g., 12,500 lb column)
+    # reference column (e.g., 12,500 lb) defines the x-axis
     if ref_weight not in tbl.columns:
         raise ValueError(f"ref_weight {ref_weight} not found in columns")
     tbl = tbl.sort_values(by=ref_weight).reset_index(drop=True).astype(float)
-
-    # X-axis tied to reference column (e.g., 12,500 lb)
     x_ref = tbl[ref_weight].values
 
-    # Find nearest lower/upper weight columns
+    # nearest lower/upper weight columns
     weights = np.array(sorted(int(c) for c in tbl.columns))
     idx = int(np.searchsorted(weights, w, side="left"))
     if idx == 0:
@@ -131,13 +152,13 @@ def lookup_tbl2_interp(df, baseline, w, ref_weight=12500, _debug=False, _st=None
         lower = int(weights[idx-1]); upper = int(weights[idx])
         w1, w2 = (upper, upper) if upper == w else (lower, upper)
 
-    # Interpolate ABSOLUTE values in each bounding column at this baseline
+    # vertical interpolation in each bounding column at this baseline
     y1 = np.interp(baseline, x_ref, tbl[w1].values,
                    left=tbl[w1].values[0], right=tbl[w1].values[-1])
     y2 = np.interp(baseline, x_ref, tbl[w2].values,
                    left=tbl[w2].values[0], right=tbl[w2].values[-1])
 
-    # Horizontal blend by proximity in weight
+    # horizontal blend by weight
     if w1 == w2:
         y = y1
     else:
@@ -151,7 +172,7 @@ st.markdown("### Step 2: Weight Adjustment")
 st.success(f"Weight-adjusted distance: **{weight_adj:.0f} ft**")
 
 # ─── Step 4: Table 3 – Wind Adjustment (1D Interpolation) ──────────────────
-# (Filename has a space — leaving it as-is to match your repo)
+# (Filename has a space — adjust here if you rename it)
 raw3      = pd.read_csv(datafile("wind adjustment.csv"), header=None)
 wind_cols = [int(w) for w in raw3.iloc[0]]
 df3       = raw3.iloc[1:].reset_index(drop=True).apply(pd.to_numeric, errors="coerce")
@@ -162,11 +183,8 @@ def lookup_tbl3_interp(df, refd, ws):
     ref_rolls  = tbl[0].values
     wind_rolls = tbl[ws].values
     deltas     = wind_rolls - ref_rolls
-    delta_wind = np.interp(refd,
-                           ref_rolls,
-                           deltas,
-                           left=deltas[0],
-                           right=deltas[-1])
+    delta_wind = np.interp(refd, ref_rolls, deltas,
+                           left=deltas[0], right=deltas[-1])
     return float(delta_wind)
 
 delta_wind = lookup_tbl3_interp(df3, weight_adj, wind)
@@ -185,26 +203,19 @@ def lookup_tbl4_interp(df, refd, h=50, ref_col=0, _debug=False, _st=None):
     2D ABSOLUTE interpolation for the 50 ft obstacle table (or any height h):
       - x-axis: reference distances in column `ref_col` (e.g., 0 ft obstacle).
       - y-axis: absolute distances in the two nearest obstacle-height columns around `h`.
-      - returns the absolute distance at obstacle height h.
     """
     tbl = df.copy()
-    # Ensure numeric columns
     tbl.columns = pd.to_numeric(tbl.columns, errors="coerce")
     tbl = tbl.dropna(axis=1, how="all")
 
-    # Build an x-axis from the reference column
     if ref_col not in tbl.columns:
         raise ValueError(f"ref_col {ref_col} not found in columns")
     tbl = tbl.sort_values(by=ref_col).reset_index(drop=True).astype(float)
     x_ref = tbl[ref_col].values
 
-    # Map available obstacle heights to their columns
     colmap = {int(c): c for c in tbl.columns if pd.notna(c)}
-
-    # Candidate obstacle columns (numeric only, excluding ref_col)
     obs_heights = sorted([k for k in colmap.keys() if k != ref_col])
 
-    # Find nearest lower/upper heights around h
     import bisect
     idx = bisect.bisect_left(obs_heights, h)
     if idx == 0:
@@ -215,13 +226,11 @@ def lookup_tbl4_interp(df, refd, h=50, ref_col=0, _debug=False, _st=None):
         lower = obs_heights[idx-1]; upper = obs_heights[idx]
         h1, h2 = (upper, upper) if upper == h else (lower, upper)
 
-    # Interpolate ABS values in each obstacle column at this refd
     y1 = np.interp(refd, x_ref, tbl[colmap[h1]].values,
                    left=tbl[colmap[h1]].values[0], right=tbl[colmap[h1]].values[-1])
     y2 = np.interp(refd, x_ref, tbl[colmap[h2]].values,
                    left=tbl[colmap[h2]].values[0], right=tbl[colmap[h2]].values[-1])
 
-    # Horizontal blend by obstacle height
     if h1 == h2:
         y = y1
     else:
@@ -241,7 +250,6 @@ st.success(f"{obs50_m:.1f} m")
 
 # ─── Step 6: Apply a Factor ────────────────────────────────────────────────
 factor = factor_options[factor_label]
-# apply factor to the raw over-50 ft distance
 factored_ft = obs50 * factor
 factored_m  = factored_ft * 0.3048
 
@@ -251,17 +259,13 @@ col1.success(f"{factored_ft:.0f} ft")
 col2.success(f"{factored_m:.1f} m")
 
 # ─── Step X: Ground Roll Corrections (Wet & Slope) ─────────────────────────
-# Build rollout-only slope factor:
-# - Only apply if downslope magnitude > 1%
+# Only apply downslope > 1% to ground roll
 if slope_deg < -1.0:
     S = 1.0 + abs(slope_deg) * 0.10   # +10% per 1% downslope
 else:
-    S = 1.0                           # ignore upslope or small magnitudes
+    S = 1.0
 
-# Combined rollout factor (surface × slope)
 rollout_factor = W * S
-
-# Add rollout-only increment to the factored total
 delta_rollout_ft = wind_adj * (rollout_factor - 1.0)
 
 required_ft = factored_ft + delta_rollout_ft
@@ -279,22 +283,16 @@ c1.success(f"GroundRoll Δ: **{delta_rollout_ft:.0f} ft**")
 c2.success(f"Final Landing Distance Required: **{required_ft:.0f} ft** / **{required_m:.1f} m**")
 
 # ─── Step Y: Landing Distance Available & Go/No-Go ─────────────────────────
-# Convert to feet
 avail_ft = avail_m / 0.3048
 
-# Display the available distance
 st.markdown("### Available Runway Length")
 c1, c2 = st.columns(2)
 c1.write(f"**{avail_m:.0f} m**")
 c2.write(f"**{avail_ft:.0f} ft**")
 
-# Determine if tailwind exists (positive wind value)
 has_tailwind = wind < 0
-
-# Check if the 1.20 factor is selected
 using_1_2_factor = factor_label == "Approved Factor (1.20)"
 
-# Go/No-Go Decision Logic
 st.markdown("### Go/No-Go Decision")
 if using_1_2_factor and has_tailwind:
     st.error("❌ Landing not permitted: No tailwind component permitted with 1.2 Factoring")
@@ -303,5 +301,8 @@ elif avail_ft >= required_ft:
 else:
     st.error("❌ Insufficient runway available for landing")
 
-st.markdown("### Data extracted from B200-601-80 HFG Perfomance Landing Distance Without Propeller Reversing - Flap 100%")
+# ─── Dynamic Footer ────────────────────────────────────────────────────────
+st.markdown("---")
+st.markdown("### Data extracted from B200-601-80 HFG Performance Landing Distance Without Propeller Reversing - Flap 100%")
+st.markdown(DATASET_META[dataset_choice]["footer"])
 st.markdown("Created by H Watson and R Thomas")
