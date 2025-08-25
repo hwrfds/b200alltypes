@@ -6,7 +6,7 @@ from pathlib import Path
 # ─── Page Setup (must be first Streamlit call) ─────────────────────────────
 st.set_page_config(page_title="RFDS QLD B200 Landing Distance Calculator", layout="wide")
 
-# ─── Dataset mapping for header & footer ───────────────────────────────────
+# ─── Dataset mapping for header, footer, and storage keys ──────────────────
 DATASET_META = {
     "set1": {
         "name": "B200 Paved",
@@ -31,10 +31,13 @@ factor_options = {
     "Approved Factor (1.20)": 1.20,
 }
 
-# ─── Sidebar: Dataset selector + inputs ────────────────────────────────────
+# ─── Sidebar: Dataset selector by friendly name ────────────────────────────
+dataset_names = [meta["name"] for meta in DATASET_META.values()]
 with st.sidebar:
-    dataset_choice = st.selectbox("Select dataset", ["set1", "set2", "set3"], index=0)
-    st.caption(f"Active dataset: **{DATASET_META[dataset_choice]['name']}**")
+    dataset_name_choice = st.selectbox("Select dataset", dataset_names, index=0)
+
+# Map back from friendly name -> key ("set1"/"set2"/"set3")
+dataset_choice = next(k for k, v in DATASET_META.items() if v["name"] == dataset_name_choice)
 
 DATA_ROOT = Path("data") / dataset_choice
 
@@ -45,6 +48,10 @@ def datafile(name: str) -> Path:
 # Dynamic page header (on-page)
 st.title(DATASET_META[dataset_choice]["title"])
 
+# Show active dataset in sidebar for quick confirmation
+with st.sidebar:
+    st.caption(f"Active dataset: **{DATASET_META[dataset_choice]['name']}**")
+
 # ─── User Inputs ───────────────────────────────────────────────────────────
 with st.sidebar:
     press_alt = st.slider("Pressure Altitude (ft)", 0, 10000, 0, 250)
@@ -52,10 +59,7 @@ with st.sidebar:
     weight = st.slider("Landing Weight (lb)", 9000, 12500, 11500, 100)
     wind = st.slider(
         "Wind Speed (kt)",
-        -10,
-        30,
-        0,
-        1,
+        -10, 30, 0, 1,
         help="Negative = tailwind, Positive = headwind",
     )
     factor_label = st.selectbox("Select Landing Distance Factor", list(factor_options.keys()))
@@ -75,17 +79,12 @@ with st.sidebar:
 
     slope_deg = st.number_input(
         "Runway Slope (%)",
-        min_value=-5.0,
-        max_value=0.0,
-        value=0.0,
-        step=0.1,
+        min_value=-5.0, max_value=0.0, value=0.0, step=0.1,
         help="Slope factor need only applied when greater than 1%",
     )
     avail_m = st.number_input(
         "Landing Distance Available (m)",
-        min_value=0.0,
-        value=1150.0,
-        step=5.0,
+        min_value=0.0, value=1150.0, step=5.0,
         help="Enter the runway length available in metres",
     )
 
@@ -98,20 +97,24 @@ tbl1.columns = tbl1.columns.astype(int)
 def lookup_tbl1_bilinear(df, pa, t):
     pas = np.array(sorted(df.index))
     oats = np.array(sorted(df.columns))
-    pa  = np.clip(pa, pas[0], pas[-1])
-    t   = np.clip(t,  oats[0], oats[-1])
+    pa = np.clip(pa, pas[0], pas[-1])
+    t  = np.clip(t,  oats[0], oats[-1])
+
     x1 = pas[pas <= pa].max()
     x2 = pas[pas >= pa].min()
     y1 = oats[oats <= t].max()
     y2 = oats[oats >= t].min()
+
     Q11 = df.at[x1, y1]; Q21 = df.at[x2, y1]
     Q12 = df.at[x1, y2]; Q22 = df.at[x2, y2]
+
     if x1 == x2 and y1 == y2:
         return Q11
     if x1 == x2:
         return Q11 + (Q12 - Q11) * (t - y1) / (y2 - y1)
     if y1 == y2:
         return Q11 + (Q21 - Q11) * (pa - x1) / (x2 - x1)
+
     denom = (x2 - x1) * (y2 - y1)
     fxy1 = Q11 * (x2 - pa) + Q21 * (pa - x1)
     fxy2 = Q12 * (x2 - pa) + Q22 * (pa - x1)
@@ -135,13 +138,11 @@ def lookup_tbl2_interp(df, baseline, w, ref_weight=12500, _debug=False, _st=None
     tbl = df.copy()
     tbl.columns = [int(c) for c in tbl.columns]
 
-    # reference column (e.g., 12,500 lb) defines the x-axis
     if ref_weight not in tbl.columns:
         raise ValueError(f"ref_weight {ref_weight} not found in columns")
     tbl = tbl.sort_values(by=ref_weight).reset_index(drop=True).astype(float)
     x_ref = tbl[ref_weight].values
 
-    # nearest lower/upper weight columns
     weights = np.array(sorted(int(c) for c in tbl.columns))
     idx = int(np.searchsorted(weights, w, side="left"))
     if idx == 0:
@@ -152,13 +153,11 @@ def lookup_tbl2_interp(df, baseline, w, ref_weight=12500, _debug=False, _st=None
         lower = int(weights[idx-1]); upper = int(weights[idx])
         w1, w2 = (upper, upper) if upper == w else (lower, upper)
 
-    # vertical interpolation in each bounding column at this baseline
     y1 = np.interp(baseline, x_ref, tbl[w1].values,
                    left=tbl[w1].values[0], right=tbl[w1].values[-1])
     y2 = np.interp(baseline, x_ref, tbl[w2].values,
                    left=tbl[w2].values[0], right=tbl[w2].values[-1])
 
-    # horizontal blend by weight
     if w1 == w2:
         y = y1
     else:
@@ -172,7 +171,7 @@ st.markdown("### Step 2: Weight Adjustment")
 st.success(f"Weight-adjusted distance: **{weight_adj:.0f} ft**")
 
 # ─── Step 4: Table 3 – Wind Adjustment (1D Interpolation) ──────────────────
-# (Filename has a space — adjust here if you rename it)
+# (Filename has a space — change here if you rename it)
 raw3      = pd.read_csv(datafile("wind adjustment.csv"), header=None)
 wind_cols = [int(w) for w in raw3.iloc[0]]
 df3       = raw3.iloc[1:].reset_index(drop=True).apply(pd.to_numeric, errors="coerce")
@@ -200,9 +199,7 @@ df4 = df4.apply(pd.to_numeric, errors="coerce").dropna().reset_index(drop=True)
 
 def lookup_tbl4_interp(df, refd, h=50, ref_col=0, _debug=False, _st=None):
     """
-    2D ABSOLUTE interpolation for the 50 ft obstacle table (or any height h):
-      - x-axis: reference distances in column `ref_col` (e.g., 0 ft obstacle).
-      - y-axis: absolute distances in the two nearest obstacle-height columns around `h`.
+    2D ABSOLUTE interpolation for the 50 ft obstacle table (or any height h).
     """
     tbl = df.copy()
     tbl.columns = pd.to_numeric(tbl.columns, errors="coerce")
