@@ -87,11 +87,7 @@ with st.sidebar:
         min_value=0.0, value=1150.0, step=5.0,
         help="Enter the runway length available in metres",
     )
-    clearway_m = st.number_input(
-        "Clearway Available (m)",
-        min_value=0.0, max_value=90.0, value=0.0, step=5.0,
-        help="Enter the clearway length available in metres",
-    )
+
 
 # ─── Step 2: Table 1 – Pressure Altitude × OAT (Bilinear Interpolation) ───
 raw1 = pd.read_csv(datafile("pressureheight_oat.csv"), skiprows=[0])
