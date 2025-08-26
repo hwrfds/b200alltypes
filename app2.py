@@ -63,15 +63,6 @@ with st.sidebar:
         help="Negative = tailwind, Positive = headwind",
     )
     factor_label = st.selectbox("Select Landing Distance Factor", list(factor_options.keys()))
-    using_1_2_factor = factor_label == "Approved Factor (1.20)"
-
-    # NEW: Safe Area (only enabled when Approved Factor 1.20 is selected)
-    safe_area_m = st.number_input(
-        "Safe Area (m)",
-        min_value=0.0, max_value=90.0, value=0.0, step=1.0,
-        help="Added to Landing Distance Available (LDA) only with Approved 1.20 Factor",
-        disabled=not using_1_2_factor,
-    )
 
     # Runway surface condition (rollout only)
     surface_choice = st.radio(
