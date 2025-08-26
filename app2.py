@@ -291,7 +291,7 @@ lda_m = avail_m + safe_area_m
 st.markdown("### Available Runway Length")
 c1, c2 = st.columns(2)
 c1.write(f"**{lda_m:.0f} m**")
-c2.write(f"**{avail_ft:.0f} ft**")
+# c2.write(f"**{avail_ft:.0f} ft**")
 
 has_tailwind = wind < 0
 using_1_2_factor = factor_label == "Approved Factor (1.20)"
@@ -305,7 +305,7 @@ if using_1_2_factor and has_tailwind:
 elif using_1_43_factor and safe_area_m > 0:
     st.error("❌ Safe Area not to be used with Standard Factoring (1.43)")
 
-elif avail_ft >= required_ft:
+elif lda_m >= required_m:
     st.success("✅ Enough runway available for landing")
 
 else:
