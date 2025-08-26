@@ -286,10 +286,11 @@ c2.success(f"Final Landing Distance Required: **{required_ft:.0f} ft** / **{requ
 
 # ─── Step Y: Landing Distance Available & Go/No-Go ─────────────────────────
 avail_ft = avail_m / 0.3048
+lda_m = avail_m + safe_area_m
 
 st.markdown("### Available Runway Length")
 c1, c2 = st.columns(2)
-c1.write(f"**{avail_m:.0f} m**")
+c1.write(f"**{lda_m:.0f} m**")
 c2.write(f"**{avail_ft:.0f} ft**")
 
 has_tailwind = wind < 0
