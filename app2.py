@@ -87,7 +87,11 @@ with st.sidebar:
         min_value=0.0, value=1150.0, step=5.0,
         help="Enter the runway length available in metres",
     )
-
+    safe_area_m = st.number_input(
+        "Safe Area (m)",
+        min_value=0.0, max_value=90.0, value=0.0, step=1.0,
+        help="Added to Landing Distance Available (LDA) only with Approved 1.20 Factor",
+    )
 
 # ─── Step 2: Table 1 – Pressure Altitude × OAT (Bilinear Interpolation) ───
 raw1 = pd.read_csv(datafile("pressureheight_oat.csv"), skiprows=[0])
