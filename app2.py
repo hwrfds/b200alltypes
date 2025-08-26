@@ -314,6 +314,6 @@ else:
 
 # ─── Dynamic Footer ────────────────────────────────────────────────────────
 st.markdown("---")
-st.markdown("### Data extracted from B200-601-80 HFG Performance Landing Distance Without Propeller Reversing - Flap 100%")
+
 st.markdown(DATASET_META[dataset_choice]["footer"])
 st.markdown("Created by H Watson and R Thomas")
