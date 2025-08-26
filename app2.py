@@ -297,14 +297,19 @@ using_1_2_factor = factor_label == "Approved Factor (1.20)"
 using_1_43_factor = factor_label == "Standard Factor (1.43)"
 
 st.markdown("### Go/No-Go Decision")
+
 if using_1_2_factor and has_tailwind:
     st.error("❌ Landing not permitted: No tailwind component permitted with 1.2 Factoring")
-elif avail_ft >= required_ft:
-    st.success("✅ Enough runway available for landing")
+
 elif using_1_43_factor and safe_area_m > 0:
     st.error("❌ Safe Area not to be used with Standard Factoring (1.43)")
+
+elif avail_ft >= required_ft:
+    st.success("✅ Enough runway available for landing")
+
 else:
     st.error("❌ Insufficient runway available for landing")
+
 
 # ─── Dynamic Footer ────────────────────────────────────────────────────────
 st.markdown("---")
