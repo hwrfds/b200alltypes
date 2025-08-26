@@ -11,17 +11,17 @@ DATASET_META = {
     "set1": {
         "name": "B200 Paved",
         "title": "🛬 RFDS QLD B200 King Air — Paved Runways",
-        "footer": "Dataset: B200 Paved performance tables (no mods).",
+        "footer": "Dataset: B200 HFG Landing Distance w Propeller Reversing- Flap 100% P/N 101-590010-279.",
     },
     "set2": {
         "name": "B200 Grass",
         "title": "🛬 RFDS QLD B200 King Air — Grass Runways",
-        "footer": "Dataset: B200 Grass performance tables.",
+        "footer": "Dataset: B200 HFG Landing Distance w/out Propeller Reversing- Flap 100% P/N 101-590010-279.",
     },
     "set3": {
         "name": "B200 Raisbeck",
-        "title": "🛬 RFDS QLD B200 King Air — Raisbeck Mod",
-        "footer": "Dataset: B200 with Raisbeck performance package.",
+        "title": "🛬 RFDS QLD B200 King Air (CAR) — Raisbeck Paved",
+        "footer": "Dataset: B200 HFG Raisbeck Landing Distance w Propeller Reversing- Flap 100% Doc No 11-116H .",
     },
 }
 
