@@ -57,6 +57,7 @@ with st.sidebar:
     press_alt = st.slider("Pressure Altitude (ft)", 0, 10000, 0, 250)
     oat = st.slider("Outside Air Temperature (°C)", -5, 45, 15, 1)
     weight = st.slider("Landing Weight (lb)", 9000, 12500, 11500, 100)
+    st.write(f"≈ {weight * 0.453592:.0f} kg")
     wind = st.slider(
         "Wind Speed (kt)",
         -10, 30, 0, 1,
